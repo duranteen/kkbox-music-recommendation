@@ -4,19 +4,43 @@ from torch.nn import init, functional as F
 
 
 class GNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim1, hidden_dim2, output_dim):
+    def __init__(self, input_dim, hidden_dim, embedding_dim,
+                 num_layers=3, dropout=0., activation=F.relu):
+        """
+        use 3 layers and residual GCNs
+        :param input_dim:
+        :param hidden_dim1:
+        :param hidden_dim2:
+        :param output_dim:
+        :param num_layers: 3 layers
+        :param dropout:
+        """
         super(GNN, self).__init__()
-        self.linear1 = nn.Linear(input_dim, hidden_dim1)
-        self.gcn_layer1 = GCNLayer(hidden_dim1, hidden_dim2)
-        self.gcn_layer2 = GCNLayer(hidden_dim2, hidden_dim2)
-        self.linear2 = nn.Linear(hidden_dim2, output_dim)
+        self.num_layers = num_layers
+        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
+        self.linear = nn.Linear(input_dim, hidden_dim)
+        self.gcn1 = GCNLayer(hidden_dim, embedding_dim)
+        self.gcn2 = GCNLayer(embedding_dim, embedding_dim)
+        # self.gcn3 = GCNLayer(embedding_dim, embedding_dim)
 
     def forward(self, adjacency, features):
-        h = F.sigmoid(self.linear1(features))
-        h = F.relu(self.gcn_layer1(adjacency, h))
-        h = F.relu(self.gcn_layer2(adjacency, h))
-        x = self.linear2(h)
-        return x
+        """
+        first, fully-connected layer transform features (project);
+        then, into 3 layers of GCNs
+        :param adjacency:
+        :param features:
+        :return:
+        """
+        projected_x = self.linear(features)
+        x = F.sigmoid(projected_x)
+        # GCN layer
+        gcn1_x = self.gcn1(adjacency, x)
+        x = self.activation(gcn1_x)
+        gcn2_x = self.gcn2(adjacency, x)
+        x = self.activation(gcn2_x)
+        gcn3_x = self.gcn2(adjacency, x)
+        return torch.cat([projected_x, gcn1_x, gcn2_x, gcn3_x], 1)
 
 
 class GCNLayer(nn.Module):
