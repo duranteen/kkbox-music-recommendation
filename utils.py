@@ -81,7 +81,7 @@ class NetworkData(object):
         features = data.values[:, 2:]
         feat_dict = {}
         for i in range(len(user_id)):
-            feat_dict['%d-%d' % (user_id[i],item_id[i])] = features[i]
+            feat_dict['%d-%d' % (user_id[i], item_id[i])] = features[i]
         return feat_dict
 
     def build_adjacency(self, train=True):

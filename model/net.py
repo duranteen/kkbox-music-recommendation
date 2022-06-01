@@ -5,8 +5,9 @@ from gnn import GNN
 
 
 class Net(nn.Module):
-
-    def __init__(self, user_input_dim, item_input_dim, hidden_dim, embedding_dim, edge_dim, dropout=0., activation=F.sigmoid, use_edge_feature=True):
+    def __init__(self, user_input_dim, item_input_dim, hidden_dim,
+                 embedding_dim, edge_dim, dropout=0.,
+                 activation=F.sigmoid, use_edge_feature=True):
         super(Net, self).__init__()
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
