@@ -5,6 +5,8 @@ import os.path as op
 import pandas as pd
 from scipy import sparse as sp
 import numpy as np
+import time
+import datetime
 
 
 class NetworkData(object):
@@ -32,7 +34,7 @@ class NetworkData(object):
 
         # feature
         self.x_user, self.x_item = \
-            self.build_node_feature(self.mem_info), self.build_node_feature(self.song_info)
+            self.build_node_feature(self.mem_info, 'mem'), self.build_node_feature(self.song_info, 'song')
         self.x_train_edge, self.x_test_edge = \
             self.build_edge_feature(self.train_data), self.build_edge_feature(self.test_data)
 
@@ -63,15 +65,29 @@ class NetworkData(object):
         # print(self.mem_info['id'].max())
         pass
 
-    def build_node_feature(self, data):
+    def build_node_feature(self, data, who='mem'):
+        # print("data sorted by node_id...")
         print("building node features ...")
-        id_col = data.columns.to_list()[0]
-        ids = list(data[id_col])
-        features = data.values[:, 1:]
-        feat_dict = {}
-        for i, id in enumerate(ids):
-            feat_dict[id] = features[i]
-        return feat_dict
+        features = None
+        if who == 'song':
+            # id_col = data.columns.to_list()[0]
+            features = data.values[:, 1:]
+            # feat_dict = {}
+            # for i, id in enumerate(ids):
+            #     feat_dict[id] = features[i]
+        if who == 'mem':
+            src_dates = data['registration_init_time']
+            dst_dates = data['expiration_date']
+            diffs = []
+            for i in range(len(src_dates)):
+                src = time.strptime(src_dates[i], "%Y-%m-%d")
+                dst = time.strptime(dst_dates[i], "%Y-%m-%d")
+                diff = datetime.date(src[0], src[1], src[2]) - datetime.date(dst[0], dst[1], dst[2])
+                diffs.append(diff)
+            data['date_diff'] = diffs
+            data.drop(['registration_init_time', 'expiration_date'], inplace=True)
+            features = data.values[:, 1:]
+        return features
 
     def build_edge_feature(self, data):
         print("building edge features ...")
