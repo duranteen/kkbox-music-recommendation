@@ -85,7 +85,7 @@ class NetworkData(object):
                 diff = datetime.date(src[0], src[1], src[2]) - datetime.date(dst[0], dst[1], dst[2])
                 diffs.append(diff)
             data['date_diff'] = diffs
-            data.drop(['registration_init_time', 'expiration_date'], inplace=True)
+            data.drop(columns=['registration_init_time', 'expiration_date'], inplace=True)
             features = data.values[:, 1:]
         return features
 

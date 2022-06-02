@@ -16,7 +16,7 @@ weight_decay = 5e-4
 num_epochs = 10
 # val_ratio = 0.2
 
-data = NetworkData()
+data = NetworkData(cache=None, save=True)
 adj, L, x_user, x_item, x_train_edge, x_test_edge, y_train = data.get_data()
 data.describe()
 # norm
