@@ -19,7 +19,7 @@ class GNN(nn.Module):
         self.num_layers = num_layers
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
-        self.linear = nn.Linear(input_dim, hidden_dim)
+        # self.linear = nn.Linear(input_dim, hidden_dim)
         self.gcn1 = GCNLayer(hidden_dim, embedding_dim)
         self.gcn2 = GCNLayer(embedding_dim, embedding_dim)
         # self.gcn3 = GCNLayer(embedding_dim, embedding_dim)
@@ -29,18 +29,19 @@ class GNN(nn.Module):
         first, fully-connected layer transform features (project);
         then, into 3 layers of GCNs
         :param adjacency:
-        :param features:
+        :param features: projected features
         :return:
         """
-        projected_x = self.linear(features)
-        x = F.sigmoid(projected_x)
+        # projected_x = self.linear(features)
+        # x = F.sigmoid(projected_x)
+        x = features
         # GCN layer
         gcn1_x = self.gcn1(adjacency, x)
         x = self.activation(gcn1_x)
         gcn2_x = self.gcn2(adjacency, x)
         x = self.activation(gcn2_x)
         gcn3_x = self.gcn2(adjacency, x)
-        return torch.cat([projected_x, gcn1_x, gcn2_x, gcn3_x], 1)
+        return torch.cat([features, gcn1_x, gcn2_x, gcn3_x], 1)
 
 
 class GCNLayer(nn.Module):

@@ -50,7 +50,7 @@ class NetworkData(object):
                 sp.save_npz(path + 'sp_x_train_edge.npz', self.x_train_edge)
                 sp.save_npz(path + 'sp_x_test_edge.npz', self.x_test_edge)
                 print("cache saved to %s" % path[:-1])
-            return self.adj, self.L, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge
+            return self.adj, self.L, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge, self.y_train
         else:
             print("using cache %s ..." % self.cache)
             adj = sp.load_npz(self.cache + 'sp_adj.npz')
@@ -80,8 +80,8 @@ class NetworkData(object):
             dst_dates = data['expiration_date']
             diffs = []
             for i in range(len(src_dates)):
-                src = time.strptime(src_dates[i], "%Y-%m-%d")
-                dst = time.strptime(dst_dates[i], "%Y-%m-%d")
+                src = time.strptime(src_dates[i], "%Y/%m/%d")
+                dst = time.strptime(dst_dates[i], "%Y/%m/%d")
                 diff = datetime.date(src[0], src[1], src[2]) - datetime.date(dst[0], dst[1], dst[2])
                 diffs.append(diff)
             data['date_diff'] = diffs
@@ -122,7 +122,13 @@ class NetworkData(object):
         return adj, self.normalize_adjacency(adj)
 
     def normalize_adjacency(self, adj):
+        """
+        L = D^-0.5 * (A + I) * D^-0.5
+        :param adj:
+        :return:
+        """
         print("normalize adjacency ...")
+        adj += sp.eye(adj.shape[0])
         row_sum = np.array(adj.sum(1))
         d_sqrt = np.power(row_sum, -0.5).flatten()
         d_sqrt[np.isinf(d_sqrt)] = 0.
