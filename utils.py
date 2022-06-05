@@ -83,7 +83,7 @@ class NetworkData(object):
                 src = time.strptime(src_dates[i], "%Y/%m/%d")
                 dst = time.strptime(dst_dates[i], "%Y/%m/%d")
                 diff = datetime.date(src[0], src[1], src[2]) - datetime.date(dst[0], dst[1], dst[2])
-                diffs.append(diff)
+                diffs.append(diff.days)
             data['date_diff'] = diffs
             data.drop(columns=['registration_init_time', 'expiration_date'], inplace=True)
             features = data.values[:, 1:]
