@@ -19,8 +19,8 @@ class NetworkData(object):
         self.mem_info = pd.read_csv(op.join(self.data_root, 'mem_info.csv'))
         self.song_info = pd.read_csv(op.join(self.data_root, 'song_info.csv'))
         # self.train_data = self.train_data[self.train_data.target == 1]
-        self.n_users = len(set(self.train_data['msno'].tolist())) + 1
-        self.n_items = len(set(self.train_data['song_id'].tolist())) + 1
+        self.n_users = len(set(self.train_data['msno'].tolist()).union(set(self.test_data['msno'].tolist()))) + 1
+        self.n_items = len(set(self.train_data['song_id'].tolist()).union(set(self.test_data['song_id'].tolist()))) + 1
         print(self.n_users, self.n_items)
         # print(self.song_info['song_id'].max())
         self.test_data.drop('id', axis=1, inplace=True)
@@ -85,6 +85,8 @@ class NetworkData(object):
             data['date_diff'] = diffs
             data.drop(columns=['registration_init_time', 'expiration_date'], inplace=True)
             features = data.values[:, 1:]
+#         if features.shape[0] < self.n_users + self.n_items:
+#             features = np.concatenate([features, np.zeros((self.n_users + self.n_items - features.shape[0], features.shape[1]))], axis=0)
         return features
 
     def build_edge_feature(self, data):

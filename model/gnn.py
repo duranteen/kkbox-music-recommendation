@@ -4,7 +4,7 @@ from torch.nn import init, functional as F
 
 
 class GNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, embedding_dim,
+    def __init__(self, input_dim, embedding_dim,
                  num_layers=3, dropout=0., activation=F.relu):
         """
         use 3 layers and residual GCNs
@@ -20,7 +20,7 @@ class GNN(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
         # self.linear = nn.Linear(input_dim, hidden_dim)
-        self.gcn1 = GCNLayer(hidden_dim, embedding_dim)
+        self.gcn1 = GCNLayer(input_dim, embedding_dim)
         self.gcn2 = GCNLayer(embedding_dim, embedding_dim)
         # self.gcn3 = GCNLayer(embedding_dim, embedding_dim)
 
@@ -61,7 +61,9 @@ class GCNLayer(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, adjacency, features):
+        print(features.shape)
         h = torch.mm(features, self.weight)
+        print(h.shape)
         h = torch.sparse.mm(adjacency, h)
         if self.use_bias:
             h = h.clone() + self.bias
