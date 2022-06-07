@@ -8,6 +8,8 @@ import numpy as np
 import time
 import datetime
 
+from tqdm import tqdm
+
 
 class NetworkData(object):
     def __init__(self, data_root='data/', cache='data/cache/', save=False):
@@ -18,46 +20,52 @@ class NetworkData(object):
         self.test_data = pd.read_csv(op.join(self.data_root, 'test_data.csv'))
         self.mem_info = pd.read_csv(op.join(self.data_root, 'mem_info.csv'))
         self.song_info = pd.read_csv(op.join(self.data_root, 'song_info.csv'))
-        # self.train_data = self.train_data[self.train_data.target == 1]
         self.n_users = len(set(self.train_data['msno'].tolist()).union(set(self.test_data['msno'].tolist()))) + 1
         self.n_items = len(set(self.train_data['song_id'].tolist()).union(set(self.test_data['song_id'].tolist()))) + 1
+        self.neg_train_data = self.train_data[self.train_data['target'] == 0]
+        self.train_data = self.train_data[self.train_data.target == 1]
         print(self.n_users, self.n_items)
-        # print(self.song_info['song_id'].max())
         self.test_data.drop('id', axis=1, inplace=True)
-        self.y_train = self.train_data['target']
-        self.train_data.drop('target', axis=1, inplace=True)
+        # self.y_train = self.train_data['target']
+        if 'target' in self.train_data.columns:
+            self.train_data.drop('target', axis=1, inplace=True)
+        if 'target' in self.neg_train_data.columns:
+            self.neg_train_data.drop('target', axis=1, inplace=True)
 
-        # adjacency and L_thelta
-        self.adj, self.L = self.build_adjacency()
-
-        # feature
-        self.x_user, self.x_item = \
-            self.build_node_feature(self.mem_info, 'mem'), self.build_node_feature(self.song_info, 'song')
-        self.x_train_edge, self.x_test_edge = \
-            self.build_edge_feature(self.train_data), self.build_edge_feature(self.test_data)
 
     def get_data(self):
         print("get data: ", end='\t')
         if self.cache is None:
+            # adjacency, L_thelta and negtive adjacency
+            self.adj, self.L, self.neg_adj = self.build_adjacency()
+
+            # feature
+            self.x_user, self.x_item = \
+                self.build_node_feature(self.mem_info, 'mem'), self.build_node_feature(self.song_info, 'song')
+            self.x_train_edge, self.x_test_edge = \
+                self.build_edge_feature(self.train_data), self.build_edge_feature(self.test_data)
             if self.save:
                 path = 'data/cache/'
                 sp.save_npz(path + 'sp_adj.npz', self.adj)
-                # sp.save_npz(path + 'sp_normal_L.npz', self.L)
-                sp.save_npz(path + 'sp_x_user.npz', self.x_user)
-                sp.save_npz(path + 'sp_x_item.npz', self.x_item)
-                sp.save_npz(path + 'sp_x_train_edge.npz', self.x_train_edge)
-                sp.save_npz(path + 'sp_x_test_edge.npz', self.x_test_edge)
+                sp.save_npz(path + 'sp_normal_L.npz', self.L)
+                sp.save_npz(path + 'sp_neg_adj.npz', self.neg_adj)
+                np.save(path + 'sp_x_user.npy', self.x_user)
+                np.save(path + 'sp_x_item.npy', self.x_item)
+                np.save(path + 'sp_x_train_edge.npy', self.x_train_edge)
+                np.save(path + 'sp_x_test_edge.npy', self.x_test_edge)
                 print("cache saved to %s" % path[:-1])
-            return self.adj, self.L, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge, self.y_train
+            return self.adj, self.L, self.neg_adj, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge
         else:
             print("using cache %s ..." % self.cache)
             adj = sp.load_npz(self.cache + 'sp_adj.npz')
             L = sp.load_npz(self.cache + 'sp_normal_L.npz')
-            x_user = sp.load_npz(self.cache + 'sp_x_user.npz')
-            x_item = sp.load_npz(self.cache + 'sp_x_item.npz')
-            x_train_edge = sp.load_npz(self.cache + 'sp_x_train_edge.npz')
-            x_test_edge = sp.load_npz(self.cache + 'sp_x_test_edge.npz')
-            return adj, L, x_user, x_item, x_train_edge, x_test_edge
+            neg_adj = sp.load_npz(self.cache + 'sp_neg_adj.npz')
+            x_user = np.load(self.cache + 'sp_x_user.npy')
+            x_item = np.load(self.cache + 'sp_x_item.npy')
+            x_train_edge = np.load(self.cache + 'sp_x_train_edge.npy', allow_pickle=True)
+            x_test_edge = np.load(self.cache + 'sp_x_test_edge.npy', allow_pickle=True)
+
+            return adj, L, neg_adj, x_user, x_item, x_train_edge, x_test_edge
 
     def id_mapping(self):
         # print(self.mem_info['id'].max())
@@ -100,26 +108,39 @@ class NetworkData(object):
             feat_dict['%d-%d' % (user_id[i], item_id[i])] = features[i]
         return feat_dict
 
-    def build_adjacency(self, train=True):
+    def build_adjacency(self):
         print("building adjacency ...")
         self.R = sp.dok_matrix((self.n_users, self.n_items), dtype=np.float32)
-        if train:
-            data = self.train_data
-        else:
-            data = self.test_data
-        for i in range(len(self.train_data)):
-            uid, iid = self.train_data['msno'][i], self.train_data['song_id'][i]
+        self.NR = sp.dok_matrix((self.n_users, self.n_items), dtype=np.float32)
+
+        src, dst = self.train_data['msno'].tolist(), self.train_data['song_id'].tolist()
+        for i in tqdm(range(len(self.train_data)), desc="build positive links=> ", leave=False):
+            uid, iid = src[i], dst[i]
             self.R[uid, iid] = 1
             # self.R[iid, uid] = 1
+        src, dst = self.neg_train_data['msno'].tolist(), self.neg_train_data['song_id'].tolist()
+        for i in tqdm(range(len(self.neg_train_data)), desc="build negtive links=> ", leave=False):
+            uid, iid = src[i], dst[i]
+            self.NR[uid, iid] = 1
+            # self.NR[iid, uid] = 1
+
         adj = sp.dok_matrix((self.n_users + self.n_items, self.n_users + self.n_items),
                             dtype=np.float32)
         adj = adj.tolil()
         R = self.R.tolil()
 
+        print("building postive adjacency ...")
         adj[: self.n_users, self.n_users:] = R
         adj[self.n_users:, :self.n_users] = R.T
         adj = adj.todok()
-        return adj, self.normalize_adjacency(adj)
+
+        print("building negtive adjacency ...")
+        neg_adj = sp.dok_matrix((self.n_users + self.n_items, self.n_users + self.n_items),
+                            dtype=np.float32).tolil()
+        NR = self.NR.tolil()
+        neg_adj[: self.n_users, self.n_users:] = NR
+        neg_adj[self.n_users:, :self.n_users] = NR.T
+        return adj.tocoo(), self.normalize_adjacency(adj), neg_adj.tocoo()
 
     def normalize_adjacency(self, adj):
         """
@@ -128,7 +149,7 @@ class NetworkData(object):
         :return:
         """
         print("normalize adjacency ...")
-        adj += sp.eye(adj.shape[0])
+        # adj += sp.eye(adj.shape[0])
         row_sum = np.array(adj.sum(1))
         d_sqrt = np.power(row_sum, -0.5).flatten()
         d_sqrt[np.isinf(d_sqrt)] = 0.
@@ -149,3 +170,25 @@ if __name__ == '__main__':
     network_data = NetworkData(cache=None, save=True)
     out = network_data.get_data()
     network_data.describe()
+
+"""
+34404 419840
+building adjacency ...
+build positive links=> : 100%|██████████| 3714656/3714656 [00:17<00:00, 210817.41it/s]
+build negtive links=> : 100%|██████████| 3662762/3662762 [00:16<00:00, 216244.49it/s]
+building postive adjacency ...
+building negtive adjacency ...
+normalize adjacency ...
+/Users/duran/PycharmProjects/kkbox-music-recommendation/utils.py:153: RuntimeWarning: divide by zero encountered in power
+  d_sqrt = np.power(row_sum, -0.5).flatten()
+building node features ...
+building node features ...
+building edge features ...
+building edge features ...
+get data: 	cache saved to data/cache
+number of users: 34404
+number of songs: 419840
+adjacency: (454244, 454244)
+Lap: (454244, 454244)
+dim of user feature: 6
+"""

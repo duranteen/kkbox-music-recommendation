@@ -46,6 +46,12 @@ class GNN(nn.Module):
 
 class GCNLayer(nn.Module):
     def __init__(self, input_dim, output_dim, use_bias=True):
+        """
+        定义一层GCN层
+        :param input_dim:
+        :param output_dim:
+        :param use_bias:
+        """
         super(GCNLayer, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -61,9 +67,12 @@ class GCNLayer(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, adjacency, features):
-        print(features.shape)
+        """
+        :param adjacency: 归一化的邻接矩阵
+        :param features:
+        :return:
+        """
         h = torch.mm(features, self.weight)
-        print(h.shape)
         h = torch.sparse.mm(adjacency, h)
         if self.use_bias:
             h = h.clone() + self.bias
