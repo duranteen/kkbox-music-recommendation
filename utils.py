@@ -158,18 +158,18 @@ class NetworkData(object):
         L = d_sqrt_mat.dot(adj).dot(d_sqrt_mat)
         return L.tocoo()
 
-    def describe(self):
-        print("number of users: %d" % self.n_users)
-        print("number of songs: %d" % self.n_items)
-        print("adjacency:", self.adj.shape)
-        print("Lap:", self.L.shape)
-        print("dim of user feature: %d" % len(self.x_user[0]))
+    # def describe(self):
+    #     print("number of users: %d" % self.n_users)
+    #     print("number of songs: %d" % self.n_items)
+    #     print("adjacency:", self.adj.shape)
+    #     print("Lap:", self.L.shape)
+    #     print("dim of user feature: %d" % len(self.x_user[0]))
 
 
-if __name__ == '__main__':
-    network_data = NetworkData(cache=None, save=True)
-    out = network_data.get_data()
-    network_data.describe()
+# if __name__ == '__main__':
+#     network_data = NetworkData(cache=None, save=True)
+#     out = network_data.get_data()
+#     network_data.describe()
 
 """
 34404 419840
