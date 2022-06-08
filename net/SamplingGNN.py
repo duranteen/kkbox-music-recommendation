@@ -106,6 +106,7 @@ class SaGNN(nn.Module):
             for hop in range(self.num_layers - layer):
                 src_feat = hidden[hop]
                 src_feat_len = len(src_feat)
+
                 neighbor_node_feat = hidden[hop + 1].view(
                     (src_feat_len, self.num_neighbor_list[hop], -1)
                 )

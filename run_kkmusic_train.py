@@ -21,17 +21,14 @@ from sampling import multi_hop_sampling
 
 from tqdm import tqdm
 
-# In[2]:
 
 
 learning_rate = 0.02
 weight_decay = 5e-4
 num_epochs = 5
-batch_size = 64
+batch_size = 2
 validation_split=.2
 
-
-# In[3]:
 
 
 data = KKMuicData()
@@ -44,19 +41,14 @@ train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuf
 val_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
 
-# In[4]:
-
-
 # norm
 x_user = x_user / x_user.sum(1, keepdims=True)
 x_item = x_item / x_item.sum(1, keepdims=True)
 
 
-# In[5]:
-
 # to tensor
-# x_user = torch.from_numpy(np.float32(x_user))
-# x_item = torch.from_numpy(np.float32(x_item))
+x_user = torch.from_numpy(np.float32(x_user))
+x_item = torch.from_numpy(np.float32(x_item))
 
 num_user_nodes, user_input_dim = x_user.shape
 num_item_nodes, item_input_dim = x_item.shape
@@ -64,24 +56,18 @@ hidden_dim = [200, 200]
 proj_dim = 500
 edge_dim = x_train_edge.shape[1] - 2
 num_nodes = num_item_nodes + num_user_nodes
+unified_feat_dim = max(user_input_dim, item_input_dim)
 
+if isinstance(x_user, np.ndarray):
+    x_user = np.concatenate([x_user,
+                         np.zeros((x_user.shape[0],
+                                   unified_feat_dim-x_user.shape[1]))],
+                        axis=1)
+if isinstance(x_user, torch.Tensor):
+    x_user = torch.cat([x_user, torch.zeros((x_user.shape[0], unified_feat_dim-x_user.shape[1]))], 1)
 
-# In[6]:
-
-# indices = torch.from_numpy(np.array([L.row, L.col]).astype("int64")).long()
-# values = torch.from_numpy(L.data.astype(np.float32))
-# adjacency = torch.sparse.FloatTensor(indices, values, L.shape)
-# adj = adj.tocoo()
-# indices = torch.from_numpy(np.array([adj.row, adj.col]).astype("int64")).long()
-# values = torch.from_numpy(adj.data.astype(np.float32))
-# y = torch.sparse.FloatTensor(indices, values, adj.shape).to_dense().reshape(-1)
-
-
-# In[30]:
-
-
-model = Net(user_input_dim=user_input_dim,
-            item_input_dim=item_input_dim,
+model = Net(user_input_dim=unified_feat_dim,
+            item_input_dim=unified_feat_dim,
             proj_dim=proj_dim,
             hidden_dim=hidden_dim,
             edge_dim=edge_dim,
@@ -114,16 +100,26 @@ def sampling_neighbor_feature(user_id, item_id,
     for i, nodes_id in enumerate(sampling_src_id):
         # if not isinstance(nodes_id, np.ndarray):
         nodes_id = np.array(nodes_id, dtype=int)
+        if len(nodes_id) == 0:
+            sampling_src_x.append(np.zeros((unified_feat_dim, )))
+            continue
         if i % 2 == 0:
+            print(x_user[nodes_id].shape)
             sampling_src_x.append(x_user[nodes_id])
         else:
+            print(x_item[nodes_id].shape)
             sampling_src_x.append(x_item[nodes_id])
     for i, nodes_id in enumerate(sampling_dst_id):
         # if not isinstance(nodes_id, np.ndarray):
         nodes_id = np.array(nodes_id, dtype=int)
+        if len(nodes_id) == 0:
+            sampling_dst_x.append(np.zeros((unified_feat_dim, )))
+            continue
         if i % 2 == 0:
+            print(x_item[nodes_id].shape)
             sampling_dst_x.append(x_item[nodes_id])
         else:
+            print(x_user[nodes_id].shape)
             sampling_dst_x.append(x_user[nodes_id])
     return sampling_src_x, sampling_dst_x
 
@@ -135,8 +131,15 @@ def train():
     model.train()
     for epoch in range(num_epochs):
         for uid, iid, y in tqdm(train_dataloader):
-            sampling_user_x, sampling_item_x = sampling_neighbor_feature(uid, iid, x_user, x_item, user2item, item2user, model.num_neighbor_list)
-            sampling_user_x, sampling_item_x = torch.from_numpy(np.array(sampling_user_x, dtype=float)), torch.from_numpy(np.array(sampling_item_x, dtype=float))
+            sampling_user_x, sampling_item_x = sampling_neighbor_feature(uid, iid, x_user, x_item,
+                                                                         user2item, item2user, model.num_neighbor_list)
+            # print(sampling_item_x, sampling_item_x)
+            # for x in sampling_item_x:
+            #     print(x)
+            # for x in sampling_user_x:
+            #     print(x)
+            # sampling_user_x, sampling_item_x = \
+            #     torch.from_numpy(np.array(sampling_user_x)).float(), torch.from_numpy(np.array(sampling_item_x)).float()
             logits = model(sampling_user_x, sampling_item_x)
             loss = criterion(logits, y)
 
@@ -152,9 +155,6 @@ def train():
             ))
 
     return loss_history, acc_history
-
-
-# In[32]:
 
 
 # test
@@ -186,7 +186,6 @@ def plot_loss_and_acc(loss_history, acc_history):
     plt.show()
 
 
-# In[33]:
 
 loss, acc = train()
 plot_loss_and_acc(loss, acc)
