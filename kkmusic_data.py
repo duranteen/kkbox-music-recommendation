@@ -96,15 +96,22 @@ class KKMuicData(dataset.Dataset):
         return np.array(features)
 
     def build_edge_feature(self, data):
+        # print("building edge features ...")
+        # user_id, item_id = list(data['msno']), list(data['song_id'])
+        # if 'target' in data.columns:
+        #     data.drop('target', axis=1, inplace=True)
+        # features = data.values[:, 2:]
+        # feat_dict = {}
+        # for i in range(len(user_id)):
+        #     feat_dict['%d-%d' % (user_id[i], item_id[i])] = features[i]
+        # return feat_dict
         print("building edge features ...")
         user_id, item_id = list(data['msno']), list(data['song_id'])
         if 'target' in data.columns:
             data.drop('target', axis=1, inplace=True)
-        features = data.values[:, 2:]
-        feat_dict = {}
-        for i in range(len(user_id)):
-            feat_dict['%d-%d' % (user_id[i], item_id[i])] = features[i]
-        return feat_dict
+        # features = data.values[:, 2:]
+        # edge_feat = np.concatenate([np.array(user_id), np.arange(item_id), features], axis=1)
+        return data.values
 
     def build_adjacency(self, train=True):
         print("building adjacency ...")

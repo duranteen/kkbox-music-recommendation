@@ -34,7 +34,7 @@ validation_split=.2
 
 
 data = KKMuicData()
-user2item, item2user, x_user, x_item, x_train_edge, x_test_edge = data.get_data()
+(user2item, item2user), x_user, x_item, x_train_edge, x_test_edge = data.get_data()
 
 train_size = int(validation_split * len(data))
 test_size = len(data) - train_size
@@ -61,7 +61,7 @@ num_user_nodes, user_input_dim = x_user.shape
 num_item_nodes, item_input_dim = x_item.shape
 hidden_dim = [200, 200]
 proj_dim = 500
-edge_dim = x_train_edge.shape[1]-2
+edge_dim = x_train_edge.shape[1] - 2
 num_nodes = num_item_nodes + num_user_nodes
 
 
