@@ -41,25 +41,33 @@ def multi_hop_sampling(src_nodes, num_sample, table1, table2):
 
 
 
-if __name__ == "__main__":
-    from kkmusic_data import KKMuicData
-
-    data = KKMuicData()
-    (user2item, item2user), x_user, x_item, x_train_edge, x_test_edge = data.get_data()
-
-    sampling_src_id = multi_hop_sampling([1, 2, 3], [5, 5], user2item, item2user)
-    sampling_dst_id = multi_hop_sampling([1, 2, 3], [5, 5], item2user, user2item)
-    print(sampling_src_id)
-    sampling_src_x = []
-    sampling_dst_x = []
-    for i, nodes_id in enumerate(sampling_src_id):
-        if i % 2 == 0:
-            sampling_src_x.append(torch.from_numpy(x_user[nodes_id]).float())
-            # sampling_dst_x.append(torch.from_numpy(x_item[sampling_dst_id[i]]).float())
-        else:
-            sampling_src_x.append(torch.from_numpy(x_item[nodes_id]).float())
-            # sampling_dst_x.append(torch.from_numpy(x_user[sampling_dst_id[i]]).float())
-
-
-    print(sampling_src_x)
-    # print(sampling_dst_x)
+# if __name__ == "__main__":
+#     from kkmusic_data import KKMuicData
+#
+#     data = KKMuicData()
+#     (user2item, item2user), x_user, x_item, x_train_edge, x_test_edge = data.get_data()
+#
+#     sampling_src_id = multi_hop_sampling([1, 2, 3], [5, 5], user2item, item2user)
+#     sampling_dst_id = multi_hop_sampling([1, 2, 3], [5, 5], item2user, user2item)
+#     print(sampling_src_id)
+#     sampling_src_x = []
+#     sampling_dst_x = []
+#     for i, nodes_id in enumerate(sampling_src_id):
+#         nodes_id = torch.from_numpy(np.array(nodes_id)).long()
+#         if i % 2 == 0:
+#             sampling_src_x.append(torch.from_numpy(x_user[nodes_id]).float())
+#             # sampling_dst_x.append(torch.from_numpy(x_item[sampling_dst_id[i]]).float())
+#         else:
+#             sampling_src_x.append(torch.from_numpy(x_item[nodes_id]).float())
+#             # sampling_dst_x.append(torch.from_numpy(x_user[sampling_dst_id[i]]).float())
+#     for i, nodes_id in enumerate(sampling_dst_id):
+#         nodes_id = torch.from_numpy(np.array(nodes_id)).long()
+#         if i % 2 == 0:
+#             sampling_dst_x.append(torch.from_numpy(x_item[nodes_id]).float())
+#             # sampling_dst_x.append(torch.from_numpy(x_item[sampling_dst_id[i]]).float())
+#         else:
+#             sampling_dst_x.append(torch.from_numpy(x_user[nodes_id]).float())
+#             # sampling_dst_x.append(torch.from_numpy(x_user[sampling_dst_id[i]]).float())
+#
+#     print(sampling_src_x)
+#     print(sampling_dst_x)
