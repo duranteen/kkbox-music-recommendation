@@ -55,8 +55,8 @@ x_item = x_item / x_item.sum(1, keepdims=True)
 # In[5]:
 
 # to tensor
-x_user = torch.from_numpy(np.float32(x_user))
-x_item = torch.from_numpy(np.float32(x_item))
+# x_user = torch.from_numpy(np.float32(x_user))
+# x_item = torch.from_numpy(np.float32(x_item))
 
 num_user_nodes, user_input_dim = x_user.shape
 num_item_nodes, item_input_dim = x_item.shape
@@ -136,6 +136,7 @@ def train():
     for epoch in range(num_epochs):
         for uid, iid, y in tqdm(train_dataloader):
             sampling_user_x, sampling_item_x = sampling_neighbor_feature(uid, iid, x_user, x_item, user2item, item2user, model.num_neighbor_list)
+            sampling_user_x, sampling_item_x = torch.from_numpy(np.array(sampling_user_x, dtype=float)), torch.from_numpy(np.array(sampling_item_x, dtype=float))
             logits = model(sampling_user_x, sampling_item_x)
             loss = criterion(logits, y)
 
