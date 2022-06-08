@@ -14,7 +14,7 @@ import os.path as op
 import scipy
 import sklearn
 
-from model.net import Net
+from net.net import Net
 # from utils import NetworkData
 from kkmusic_data import KKMuicData
 

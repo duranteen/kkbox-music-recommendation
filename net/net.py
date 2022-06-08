@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 from torch.nn import functional as F
 # from GNN import GNN
-from model.SamplingGNN import SaGNN as GNN
+from net.SamplingGNN import SaGNN as GNN
 from sampling import multi_hop_sampling
 
 
