@@ -17,6 +17,7 @@ import sklearn
 from net.net import Net
 # from utils import NetworkData
 from kkmusic_data import KKMuicData
+from sampling import multi_hop_sampling
 
 from tqdm import tqdm
 
@@ -90,6 +91,41 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=
 criterion = nn.CrossEntropyLoss
 
 
+def sampling_neighbor_feature(user_id, item_id,
+                              x_user, x_item,
+                              user2item, item2user,
+                              num_neighbor_list):
+    """
+
+    :param user_id:
+    :param item_id:
+    :param x_user:
+    :param x_item:
+    :param user2item:
+    :param item2user:
+    :param num_neighbor_list:
+    :return:
+    """
+
+    sampling_src_id = multi_hop_sampling(user_id, num_neighbor_list, user2item, item2user)
+    sampling_dst_id = multi_hop_sampling(item_id, num_neighbor_list, item2user, user2item)
+    sampling_src_x = []
+    sampling_dst_x = []
+    for i, nodes_id in enumerate(sampling_src_id):
+        nodes_id = torch.from_numpy(np.array(nodes_id)).long()
+        if i % 2 == 0:
+            sampling_src_x.append(torch.from_numpy(x_user[nodes_id]).float())
+        else:
+            sampling_src_x.append(torch.from_numpy(x_item[nodes_id]).float())
+    for i, nodes_id in enumerate(sampling_dst_id):
+        nodes_id = torch.from_numpy(np.array(nodes_id)).long()
+        if i % 2 == 0:
+            sampling_dst_x.append(torch.from_numpy(x_item[nodes_id]).float())
+        else:
+            sampling_dst_x.append(torch.from_numpy(x_user[nodes_id]).float())
+    return sampling_src_x, sampling_dst_x
+
+
 # train
 def train():
     loss_history = []
@@ -97,7 +133,8 @@ def train():
     model.train()
     for epoch in range(num_epochs):
         for uid, iid, y in tqdm(train_dataloader):
-            logits = model(uid, iid, x_user, x_item, x_train_edge, user2item, item2user)
+            sampling_user_x, sampling_item_x = sampling_neighbor_feature(uid, iid, x_user, x_item, user2item, item2user, model.num_neighbor_list)
+            logits = model(sampling_user_x, sampling_item_x)
             loss = criterion(logits, y)
 
             optimizer.zero_grad()

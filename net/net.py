@@ -41,28 +41,18 @@ class Net(nn.Module):
         #     self.linear = nn.Linear(hidden_dim[0] * len(hidden_dim), 2)
         # self.sample = Sample(hidden_dim+embedding_dim*3, edge_dim)
 
-    def forward(self, user_id, item_id,
-                user_feat, item_feat,
-                edge_feature, num_sampling,
-                user2item, item2user):
+    def forward(self, sampling_user_feat, sampling_item_feat):
 
-        # 先对特征进行映射
-        print("特征映射...")
-        user_proj_feat = self.activation(self.proj_user(user_feat[user_id]))
-        item_proj_feat = self.activation(self.proj_item(item_feat[item_id]))
+        # 特征映射
+        user_feat = self.proj_user(sampling_user_feat)
+        item_feat = self.proj_item(sampling_item_feat)
 
-
-        print("采样邻居特征...")
-        sampling_user_feat, sampling_item_feat = \
-            self.sampling_neighbor_feature(user_id, item_id,
-                                           user_proj_feat, item_proj_feat,
-                                           user2item, item2user)
-        user_hidden = self.gnn_user(sampling_user_feat)
-        item_hidden = self.gnn_item(sampling_item_feat)
+        user_hidden = self.gnn_user(user_feat)
+        item_hidden = self.gnn_item(item_feat)
         print("预测边...")
         user_item_pred = torch.mul(user_hidden, item_hidden)
 
-        return self.linear(user_item_pred), num_sampling
+        return self.linear(user_item_pred)
 
         # x = torch.mul(embd_user, embd_item)
         # if self.use_edge_feature:
@@ -71,33 +61,7 @@ class Net(nn.Module):
         # return self.activation(x)
 
 
-    def sampling_neighbor_feature(self, user_id,
-                                  item_id,
-                                  user_feat,
-                                  item_feat,
-                                  user2item,
-                                  item2user):
-        """
 
-        :param user_feat: pos_indices
-        :param item_feat:
-        :param adj:
-        :return:
-        """
-
-        sampling_src_id = multi_hop_sampling(user_id, self.num_neighbor_list, user2item, item2user)
-        sampling_dst_id = multi_hop_sampling(item_id, self.num_neighbor_list, item2user, user2item)
-        sampling_src_x = []
-        sampling_dst_x = []
-        for i, nodes_id in enumerate(sampling_src_id):
-            if i % 2 == 0:
-                sampling_src_x.append(torch.from_numpy(user_feat[nodes_id]).float())
-                sampling_dst_x.append(torch.from_numpy(item_feat[sampling_dst_id[i]]).float())
-            else:
-                sampling_src_x.append(torch.from_numpy(item_feat[nodes_id]).float())
-                sampling_dst_x.append(torch.from_numpy(user_feat[sampling_dst_id[i]]).float())
-
-        return sampling_src_x, sampling_dst_x
 
 
 """
