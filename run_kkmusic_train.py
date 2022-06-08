@@ -112,17 +112,19 @@ def sampling_neighbor_feature(user_id, item_id,
     sampling_src_x = []
     sampling_dst_x = []
     for i, nodes_id in enumerate(sampling_src_id):
-        nodes_id = torch.from_numpy(np.array(nodes_id)).long()
+        # if not isinstance(nodes_id, np.ndarray):
+        nodes_id = np.array(nodes_id, dtype=int)
         if i % 2 == 0:
-            sampling_src_x.append(torch.from_numpy(x_user[nodes_id]).float())
+            sampling_src_x.append(x_user[nodes_id])
         else:
-            sampling_src_x.append(torch.from_numpy(x_item[nodes_id]).float())
+            sampling_src_x.append(x_item[nodes_id])
     for i, nodes_id in enumerate(sampling_dst_id):
-        nodes_id = torch.from_numpy(np.array(nodes_id)).long()
+        # if not isinstance(nodes_id, np.ndarray):
+        nodes_id = np.array(nodes_id, dtype=int)
         if i % 2 == 0:
-            sampling_dst_x.append(torch.from_numpy(x_item[nodes_id]).float())
+            sampling_dst_x.append(x_item[nodes_id])
         else:
-            sampling_dst_x.append(torch.from_numpy(x_user[nodes_id]).float())
+            sampling_dst_x.append(x_user[nodes_id])
     return sampling_src_x, sampling_dst_x
 
 

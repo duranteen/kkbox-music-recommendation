@@ -44,8 +44,8 @@ class Net(nn.Module):
     def forward(self, sampling_user_feat, sampling_item_feat):
 
         # 特征映射
-        user_feat = self.proj_user(sampling_user_feat)
-        item_feat = self.proj_item(sampling_item_feat)
+        user_feat = self.proj_user(torch.Tensor(sampling_user_feat))
+        item_feat = self.proj_item(torch.Tensor(sampling_item_feat))
 
         user_hidden = self.gnn_user(user_feat)
         item_hidden = self.gnn_item(item_feat)
