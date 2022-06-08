@@ -34,7 +34,7 @@ class NetworkData(object):
 
 
     def get_data(self):
-        print("get data: ", end='\t')
+        print("get data ... ")
         if self.cache is None:
             # adjacency, L_thelta and negtive adjacency
             self.adj, self.L, self.neg_adj = self.build_adjacency()
@@ -62,8 +62,8 @@ class NetworkData(object):
             neg_adj = sp.load_npz(self.cache + 'sp_neg_adj.npz')
             x_user = np.load(self.cache + 'sp_x_user.npy')
             x_item = np.load(self.cache + 'sp_x_item.npy')
-            x_train_edge = np.load(self.cache + 'sp_x_train_edge.npy', allow_pickle=True)
-            x_test_edge = np.load(self.cache + 'sp_x_test_edge.npy', allow_pickle=True)
+            x_train_edge = np.load(self.cache + 'sp_x_train_edge.npy')
+            x_test_edge = np.load(self.cache + 'sp_x_test_edge.npy')
 
             return adj, L, neg_adj, x_user, x_item, x_train_edge, x_test_edge
 
@@ -102,11 +102,9 @@ class NetworkData(object):
         user_id, item_id = list(data['msno']), list(data['song_id'])
         if 'target' in data.columns:
             data.drop('target', axis=1, inplace=True)
-        features = data.values[:, 2:]
-        feat_dict = {}
-        for i in range(len(user_id)):
-            feat_dict['%d-%d' % (user_id[i], item_id[i])] = features[i]
-        return feat_dict
+        # features = data.values[:, 2:]
+        # edge_feat = np.concatenate([np.array(user_id), np.arange(item_id), features], axis=1)
+        return data.values
 
     def build_adjacency(self):
         print("building adjacency ...")
@@ -158,18 +156,18 @@ class NetworkData(object):
         L = d_sqrt_mat.dot(adj).dot(d_sqrt_mat)
         return L.tocoo()
 
-    # def describe(self):
-    #     print("number of users: %d" % self.n_users)
-    #     print("number of songs: %d" % self.n_items)
-    #     print("adjacency:", self.adj.shape)
-    #     print("Lap:", self.L.shape)
-    #     print("dim of user feature: %d" % len(self.x_user[0]))
+    def describe(self):
+        print("number of users: %d" % self.n_users)
+        print("number of songs: %d" % self.n_items)
+        print("adjacency:", self.adj.shape)
+        print("Lap:", self.L.shape)
+        print("dim of user feature: %d" % len(self.x_user[0]))
 
 
-# if __name__ == '__main__':
-#     network_data = NetworkData(cache=None, save=True)
-#     out = network_data.get_data()
-#     network_data.describe()
+if __name__ == '__main__':
+    network_data = NetworkData(cache=None, save=True)
+    out = network_data.get_data()
+    # network_data.describe()
 
 """
 34404 419840

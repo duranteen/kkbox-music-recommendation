@@ -41,35 +41,25 @@ class Net(nn.Module):
         #     self.linear = nn.Linear(hidden_dim[0] * len(hidden_dim), 2)
         # self.sample = Sample(hidden_dim+embedding_dim*3, edge_dim)
 
-    def forward(self, adj,  neg_adj, L, user_feat, item_feat, edge_feature, sampling=0.1):
+    def forward(self, user_id, item_id,
+                user_feat, item_feat,
+                edge_feature, num_sampling,
+                user2item, item2user):
 
         # 先对特征进行映射
-        user_proj_feat = self.activation(self.proj_user(user_feat))
-        item_proj_feat = self.activation(self.proj_item(item_feat))
+        print("特征映射...")
+        user_proj_feat = self.activation(self.proj_user(user_feat[user_id]))
+        item_proj_feat = self.activation(self.proj_item(item_feat[item_id]))
 
-        # 采样大小
-        num_sampling = sampling * len(adj.tocoo().data)
 
-        # 选取正样本
-        pos_indices = np.array([L.row, L.col]).astype("int64").T
-        pos_index = np.random.choice(range(len(pos_indices)), size=(num_sampling // 2,))
-        pos_src_dst_index = pos_indices[pos_index]
-        # 选取负样本
-        neg_indices = np.array([neg_adj.row, neg_adj.col]).astype("int64").T
-        neg_index = np.random.choice(range(len(neg_indices)), size=(num_sampling // 2,))
-        neg_src_dst_index = neg_indices[[neg_index]]
-
-        # sampled_user_feat = user_proj_feat[list(pos_src_dst_index[:, 0])]
-        # sampled_item_feat = item_proj_feat[list(pos_src_dst_index[:, 1])]
-
-        sampling_user_feat, sampling_item_feat = self.sampling_neighbor_feature(pos_src_dst_index,
-                                                                                neg_src_dst_index,
-                                                                                user_proj_feat,
-                                                                                item_proj_feat,
-                                                                                pos_indices)
+        print("采样邻居特征...")
+        sampling_user_feat, sampling_item_feat = \
+            self.sampling_neighbor_feature(user_id, item_id,
+                                           user_proj_feat, item_proj_feat,
+                                           user2item, item2user)
         user_hidden = self.gnn_user(sampling_user_feat)
         item_hidden = self.gnn_item(sampling_item_feat)
-
+        print("预测边...")
         user_item_pred = torch.mul(user_hidden, item_hidden)
 
         return self.linear(user_item_pred), num_sampling
@@ -80,7 +70,13 @@ class Net(nn.Module):
         # x = self.linear(x)
         # return self.activation(x)
 
-    def sampling_neighbor_feature(self, pos_src_dst_index, neg_src_dst_index, user_feat, item_feat, adj):
+
+    def sampling_neighbor_feature(self, user_id,
+                                  item_id,
+                                  user_feat,
+                                  item_feat,
+                                  user2item,
+                                  item2user):
         """
 
         :param user_feat: pos_indices
@@ -88,26 +84,9 @@ class Net(nn.Module):
         :param adj:
         :return:
         """
-        src_dst_index = np.concatenate([pos_src_dst_index, neg_src_dst_index], axis=0)
 
-        # 构建邻接表 dict
-        user2item = {}
-        item2user = {}
-        for i in range(len(adj)):
-            uid, iid = adj[i][0], adj[i][1]
-            if uid in user2item:
-                user2item[uid].append(iid)
-            else:
-                user2item[uid] = [iid]
-            if iid in item2user:
-                item2user[iid].append(uid)
-            else:
-                item2user[iid] = [uid]
-
-        sampling_src_id = multi_hop_sampling(src_dst_index[:, 0],
-                                                self.num_neighbor_list, user2item)
-        sampling_dst_id = multi_hop_sampling(src_dst_index[:, 1],
-                                                self.num_neighbor_list, item2user)
+        sampling_src_id = multi_hop_sampling(user_id, self.num_neighbor_list, user2item, item2user)
+        sampling_dst_id = multi_hop_sampling(item_id, self.num_neighbor_list, item2user, user2item)
         sampling_src_x = []
         sampling_dst_x = []
         for i, nodes_id in enumerate(sampling_src_id):

@@ -74,7 +74,7 @@ class GCNLayer(nn.Module):
 
 
 class SaGNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim=[500, 500], num_neighbor_list=[100, 100]):
+    def __init__(self, input_dim, hidden_dim=[200, 200], num_neighbor_list=[10, 10]):
         """
 
         :param input_dim:
@@ -98,6 +98,7 @@ class SaGNN(nn.Module):
         :param node_features_list:
         :return:
         """
+        print("GCN message passing...")
         hidden = node_features_list
         for layer in range(self.num_layers):
             next_hidden = []
