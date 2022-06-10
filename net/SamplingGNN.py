@@ -74,7 +74,7 @@ class GCNLayer(nn.Module):
 
 
 class SaGNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim=[200, 200], num_neighbor_list=[10, 10]):
+    def __init__(self, input_dim, hidden_dim=[256, 256], num_neighbor_list=[10, 10]):
         """
 
         :param input_dim:
@@ -98,7 +98,7 @@ class SaGNN(nn.Module):
         :param node_features_list:
         :return:
         """
-        print("GCN message passing...")
+        # print("GCN message passing...")
         hidden = node_features_list
         for layer in range(self.num_layers):
             next_hidden = []
@@ -106,11 +106,10 @@ class SaGNN(nn.Module):
             for hop in range(self.num_layers - layer):
                 src_feat = hidden[hop]
                 src_feat_len = len(src_feat)
-
-                neighbor_node_feat = hidden[hop + 1].view(
-                    (src_feat_len, self.num_neighbor_list[hop], -1)
-                )
+                neighbor_node_feat = hidden[hop+1].view(
+                    (src_feat_len, self.num_neighbor_list[hop], -1))
                 h = gcn(src_feat, neighbor_node_feat)
                 next_hidden.append(h)
             hidden = next_hidden
+
         return hidden[0]

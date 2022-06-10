@@ -1,5 +1,6 @@
 # build adjacency and normalize adjacency
 import itertools
+import os
 import os.path as op
 
 import pandas as pd
@@ -13,12 +14,12 @@ from torch.utils.data import dataloader
 
 
 class KKMuicData(dataset.Dataset):
-    def __init__(self, data_root='data/', train=True, cache='data/cache/', save=False):
+    def __init__(self, data_root='data/', train=True, cache=False, save=False):
         self.data_root = data_root
         self.train = train
         self.cache = cache
         self.save = save
-
+        self.cache_root = 'data/cache/'
         if self.train:
             self.data = pd.read_csv(op.join(self.data_root, 'train_data.csv'))
         else:
@@ -40,17 +41,17 @@ class KKMuicData(dataset.Dataset):
 
         # adjacency and L_thelta
         # self.adj, self.L = self.build_adjacency()
-        self.adj_table = self.build_adjacency()
-
-        self.x_user, self.x_item = \
-            self.build_node_feature(self.mem_info, 'mem'), self.build_node_feature(self.song_info, 'song')
-        self.x_train_edge, self.x_test_edge = \
-            self.build_edge_feature(self.train_data), self.build_edge_feature(self.test_data)
+        if not (self.cache and op.exists(self.cache_root)):
+            self.adj_table = self.build_adjacency()
+            self.x_user, self.x_item = \
+                self.build_node_feature(self.mem_info, 'mem'), self.build_node_feature(self.song_info, 'song')
+            self.x_train_edge, self.x_test_edge = \
+                self.build_edge_feature(self.train_data), self.build_edge_feature(self.test_data)
 
 
     def __getitem__(self, item):
         # feature
-        return self.data['msno'].tolist()[item], self.data['song_id'].tolist()[item], self.y_train[item]
+        return self.data['msno'][item], self.data['song_id'][item], self.y_train[item]
 
 
     def __len__(self):
@@ -58,7 +59,28 @@ class KKMuicData(dataset.Dataset):
 
 
     def get_data(self):
-        print("get data: ", end='\t')
+        print("now get data ... ")
+        if self.cache:
+            if not op.exists(self.cache_root):
+                os.mkdir(self.cache_root)
+                print("cache path not existing, mkdir %s" % self.cache_root)
+                np.save(self.cache_root+'user2item.npy', self.adj_table[0])
+                np.save(self.cache_root+'item2user.npy', self.adj_table[1])
+                np.save(self.cache_root+'x_user.npy', self.x_user)
+                np.save(self.cache_root + 'x_item.npy', self.x_item)
+                np.save(self.cache_root + 'x_train_edge.npy', self.x_train_edge)
+                np.save(self.cache_root + 'x_test_edge.npy', self.x_test_edge)
+                print("saved to %s" % self.cache_root)
+            print("using cache: %s" % self.cache_root)
+            user2item = np.load(self.cache_root+'user2item.npy', allow_pickle=True)
+            item2user = np.load(self.cache_root+'item2user.npy', allow_pickle=True)
+            x_user = np.load(self.cache_root+'x_user.npy')
+            x_item = np.load(self.cache_root + 'x_item.npy')
+            x_train_edge = np.load(self.cache_root + 'x_train_edge.npy')
+            x_test_edge = np.load(self.cache_root + 'x_test_edge.npy')
+            return (user2item, item2user), x_user, x_item, x_train_edge, x_test_edge
+
+
         return self.adj_table, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge
 
 
@@ -66,6 +88,7 @@ class KKMuicData(dataset.Dataset):
     def build_node_feature(self, data, who='mem'):
         print("building node features ...")
         features = []
+        data = data.fillna(0)
         if who == 'song':
             index_data = data.set_index('song_id')
             num_col = len(index_data.columns)
@@ -106,6 +129,7 @@ class KKMuicData(dataset.Dataset):
         #     feat_dict['%d-%d' % (user_id[i], item_id[i])] = features[i]
         # return feat_dict
         print("building edge features ...")
+        data = data.fillna(0)
         user_id, item_id = list(data['msno']), list(data['song_id'])
         if 'target' in data.columns:
             data.drop('target', axis=1, inplace=True)
@@ -146,6 +170,8 @@ class KKMuicData(dataset.Dataset):
                 item2user[iid].append(uid)
             else:
                 item2user[iid] = [uid]
+        user2item[-1] = [-1]
+        item2user[-1] = [-1]
         return user2item, item2user
 
     # def normalize_adjacency(self, adj):
@@ -174,8 +200,10 @@ if __name__ == '__main__':
 
     loader = dataloader.DataLoader(dataset=kk, batch_size=32, shuffle=True)
 
-    print(x_user.shape, x_item.shape)
-    print(kk.n_users, kk.n_items)
+    # print(user2item)
+    #
+    # print(x_user.shape, x_item.shape)
+    # print(kk.n_users, kk.n_items)
 
     # for uid, iid, y in loader:
     #     print(uid, iid, y)

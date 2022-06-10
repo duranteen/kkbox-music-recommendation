@@ -8,32 +8,22 @@ from sampling import multi_hop_sampling
 
 
 class Net(nn.Module):
-    def __init__(self, user_input_dim, item_input_dim, proj_dim, hidden_dim,
+    def __init__(self, user_input_dim, item_input_dim, hidden_dim,
                  edge_dim, dropout=0., num_neighbor_list=[100, 100],
                  activation=torch.sigmoid, use_edge_feature=True):
-        """
 
-        :param user_input_dim:
-        :param item_input_dim:
-        :param hidden_dim: 各隐藏层的维度
-        :param edge_dim:
-        :param sampling:
-        :param dropout:
-        :param activation:
-        :param use_edge_feature:
-        """
 
         super(Net, self).__init__()
         self.dropout = nn.Dropout(dropout)
         # self.sampling = sampling
         self.activation = activation
         self.use_edge_feature = use_edge_feature
-        self.proj_user = nn.Linear(user_input_dim, proj_dim)
-        self.proj_item = nn.Linear(item_input_dim, proj_dim)
-        self.gnn_user = GNN(proj_dim, hidden_dim, num_neighbor_list)
-        self.gnn_item = GNN(proj_dim, hidden_dim, num_neighbor_list)
+        # self.proj_user = nn.Linear(user_input_dim, proj_dim)
+        # self.proj_item = nn.Linear(item_input_dim, proj_dim)
+        self.gnn_user = GNN(item_input_dim, hidden_dim, num_neighbor_list)
+        self.gnn_item = GNN(item_input_dim, hidden_dim, num_neighbor_list)
         self.num_neighbor_list = num_neighbor_list
-        self.linear = nn.Linear(hidden_dim[-1], 1)
+        self.linear = nn.Linear(hidden_dim[-1], 2)
         # self.proj_dim = proj_dim
         # if use_edge_feature:
         #     self.linear = nn.Linear(hidden_dim[0] * len(hidden_dim) + edge_dim, 2)
@@ -49,10 +39,9 @@ class Net(nn.Module):
 
         user_hidden = self.gnn_user(sampling_user_feat)
         item_hidden = self.gnn_item(sampling_item_feat)
-        print("预测边...")
-        user_item_pred = torch.mul(user_hidden, item_hidden)
+        user_item_pred = self.linear(torch.mul(user_hidden, item_hidden))
 
-        return self.linear(user_item_pred)
+        return user_item_pred
 
         # x = torch.mul(embd_user, embd_item)
         # if self.use_edge_feature:
