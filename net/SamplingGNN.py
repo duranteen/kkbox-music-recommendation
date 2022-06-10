@@ -6,7 +6,7 @@ from torch.nn import init
 
 class MessagePassing(nn.Module):
     def __init__(self, input_dim, output_dim,
-                 use_bias=False, activation=F.relu):
+                 use_bias=True):
         """
 
         :param input_dim:
@@ -18,14 +18,13 @@ class MessagePassing(nn.Module):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.use_bias = use_bias
-        self.activation = activation
         self.weight = nn.Parameter(torch.Tensor(input_dim, output_dim), requires_grad=True)
         if self.use_bias:
             self.bias = nn.Parameter(torch.Tensor(self.output_dim), requires_grad=True)
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.kaiming_uniform_(self.weight)
+        init.xavier_uniform_(self.weight)
         if self.use_bias:
             init.zeros_(self.bias)
 
@@ -39,14 +38,12 @@ class MessagePassing(nn.Module):
         neighbor_hidden = torch.matmul(neighbor_message, self.weight)
         if self.use_bias:
             neighbor_hidden += self.bias
-        # if self.avtivation:
-        #     neighbor_hidden = self.activation(neighbor_hidden)
         return neighbor_hidden
 
 
 class GCNLayer(nn.Module):
     def __init__(self, input_dim, hidden_dim,
-                 activation=F.relu):
+                 activation=F.leaky_relu):
         """
 
         :param input_dim:
@@ -62,7 +59,7 @@ class GCNLayer(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.kaiming_uniform_(self.weight)
+        init.xavier_uniform_(self.weight)
 
     def forward(self, src_features, neighbor_features):
         neighbor_hidden = self.aggregator(neighbor_features)

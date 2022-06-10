@@ -10,7 +10,7 @@ from sampling import multi_hop_sampling
 class Net(nn.Module):
     def __init__(self, user_input_dim, item_input_dim, hidden_dim,
                  edge_dim, dropout=0., num_neighbor_list=[100, 100],
-                 activation=torch.sigmoid, use_edge_feature=True):
+                 activation=F.leaky_relu, use_edge_feature=True):
 
 
         super(Net, self).__init__()
@@ -37,11 +37,11 @@ class Net(nn.Module):
         # user_feat = self.proj_user(sampling_user_feat)
         # item_feat = self.proj_item(sampling_item_feat)
 
-        user_hidden = self.gnn_user(sampling_user_feat)
-        item_hidden = self.gnn_item(sampling_item_feat)
+        user_hidden = self.activation(self.gnn_user(sampling_user_feat))
+        item_hidden = self.activation(self.gnn_item(sampling_item_feat))
         user_item_pred = self.linear(torch.mul(user_hidden, item_hidden))
 
-        return user_item_pred
+        return torch.sigmoid(user_item_pred)
 
         # x = torch.mul(embd_user, embd_item)
         # if self.use_edge_feature:

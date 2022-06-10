@@ -6,6 +6,7 @@
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
 import pandas as pd
@@ -24,8 +25,8 @@ from sampling import multi_hop_sampling
 from tqdm import tqdm
 
 
-learning_rate = 0.1
-weight_decay = 5e-4
+learning_rate = 0.5
+weight_decay = 0.
 num_epochs = 5
 batch_size = 512
 validation_split = .2
@@ -34,26 +35,30 @@ validation_split = .2
 data = KKMuicData()
 (user2item, item2user), x_user, x_item, x_train_edge, x_test_edge = data.get_data()
 
-train_size = int(validation_split * len(data))
-test_size = len(data) - train_size
-train_dataset, test_dataset = torch.utils.data.random_split(data, [train_size, test_size])
-train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-val_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+# train_size = int(validation_split * len(data))
+# test_size = len(data) - train_size
+# train_dataset, test_dataset = torch.utils.data.random_split(data, [train_size, test_size])
+train_dataloader = DataLoader(dataset=data, batch_size=batch_size, shuffle=True)
+# val_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
 
 # norm
-x_user = x_user / (x_user.sum(1, keepdims=True) + 0.01)
-x_item = x_item / (x_item.sum(1, keepdims=True) + 0.01)
+# x_user = x_user / (x_user.sum(1, keepdims=True) + 0.01)
+# x_item = x_item / (x_item.sum(1, keepdims=True) + 0.01)
 
 
 # to tensor
 x_user = torch.from_numpy(np.float32(x_user))
 x_item = torch.from_numpy(np.float32(x_item))
 
+x_user = F.normalize(x_user, dim=1)
+x_item = F.normalize(x_item, dim=1)
+
+
 num_user_nodes, user_input_dim = x_user.shape
 num_item_nodes, item_input_dim = x_item.shape
-hidden_dim = [256, 256]
-proj_dim = 500
+hidden_dim = [256, 128, 64]
+num_neighboe_list = [10, 10, 10]
 edge_dim = x_train_edge.shape[1] - 2
 num_nodes = num_item_nodes + num_user_nodes
 unified_feat_dim = max(user_input_dim, item_input_dim)
@@ -72,11 +77,10 @@ model = Net(user_input_dim=unified_feat_dim,
             item_input_dim=unified_feat_dim,
             hidden_dim=hidden_dim,
             edge_dim=edge_dim,
-            num_neighbor_list=[20, 20],
+            num_neighbor_list=num_neighboe_list,
             use_edge_feature=False)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 criterion = nn.CrossEntropyLoss()
-
 
 def sampling_neighbor_feature(user_id, item_id,
                               x_user, x_item,
