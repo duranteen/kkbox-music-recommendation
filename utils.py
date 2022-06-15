@@ -1,8 +1,10 @@
 # build adjacency and normalize adjacency
-import itertools
 import os.path as op
+import os
+import random
 
 import pandas as pd
+import torch
 from scipy import sparse as sp
 import numpy as np
 import time
@@ -10,77 +12,91 @@ import datetime
 
 from tqdm import tqdm
 
+from torch.utils.data import dataset
 
-class NetworkData(object):
-    def __init__(self, data_root='data/', cache='data/cache/', save=False):
+
+class NetworkData(dataset.Dataset):
+    def __init__(self, data_root='data/', cache='data/cache2/'):
+        print("loading data ... ")
         self.data_root = data_root
         self.cache = cache
-        self.save = save
         self.train_data = pd.read_csv(op.join(self.data_root, 'train_data.csv'))
+        self.data = self.train_data
         self.test_data = pd.read_csv(op.join(self.data_root, 'test_data.csv'))
         self.mem_info = pd.read_csv(op.join(self.data_root, 'mem_info.csv'))
         self.song_info = pd.read_csv(op.join(self.data_root, 'song_info.csv'))
-        self.n_users = len(set(self.train_data['msno'].tolist()).union(set(self.test_data['msno'].tolist()))) + 1
-        self.n_items = len(set(self.train_data['song_id'].tolist()).union(set(self.test_data['song_id'].tolist()))) + 1
-        self.neg_train_data = self.train_data[self.train_data['target'] == 0]
+        self.n_users = max(set(self.train_data['msno'].tolist()).union(set(self.test_data['msno'].tolist())))+1
+        self.n_items = max(set(self.train_data['song_id'].tolist()).union(set(self.test_data['song_id'].tolist())))+1
         self.train_data = self.train_data[self.train_data.target == 1]
         print(self.n_users, self.n_items)
+        self.user2item = {}
+        self.neg_user2item = {}
         self.test_data.drop('id', axis=1, inplace=True)
-        # self.y_train = self.train_data['target']
+        self.y_train = self.data['target']
         if 'target' in self.train_data.columns:
-            self.train_data.drop('target', axis=1, inplace=True)
-        if 'target' in self.neg_train_data.columns:
-            self.neg_train_data.drop('target', axis=1, inplace=True)
+            self.train_data = self.train_data.drop('target', axis=1)
+        src, dst = self.train_data['msno'].tolist(), self.train_data['song_id'].tolist()
+        for i in tqdm(range(len(self.train_data)), desc="build user-item table=> "):
+            uid, iid = src[i], dst[i]
+            if uid in self.user2item:
+                self.user2item[uid].append(iid)
+            else:
+                self.user2item[uid] = [iid]
+        self.existing_users = self.user2item.keys()
 
+        try:
+            self.adj = sp.load_npz(self.cache + 'sp_adj.npz')
+            self.L = sp.load_npz(self.cache + 'sp_normal_L.npz')
+            self.x_user = np.load(self.cache + 'x_user.npy')
+            self.x_item = np.load(self.cache + 'x_item.npy')
+            self.x_train_edge = np.load(self.cache + 'x_train_edge.npy')
+            self.x_test_edge = np.load(self.cache + 'x_test_edge.npy')
+            print("using cache: %s" % self.cache)
 
-    def get_data(self):
-        print("get data ... ")
-        if self.cache is None:
-            # adjacency, L_thelta and negtive adjacency
-            self.adj, self.L, self.neg_adj = self.build_adjacency()
-
+        except FileNotFoundError:
+            if not op.exists(self.cache):
+                os.mkdir(self.cache)
+                print("cache path not existing, mkdir %s" % self.cache)
+            # adjacency
+            self.adj, self.L = self.build_adjacency()
             # feature
             self.x_user, self.x_item = \
                 self.build_node_feature(self.mem_info, 'mem'), self.build_node_feature(self.song_info, 'song')
             self.x_train_edge, self.x_test_edge = \
                 self.build_edge_feature(self.train_data), self.build_edge_feature(self.test_data)
-            if self.save:
-                path = 'data/cache/'
-                sp.save_npz(path + 'sp_adj.npz', self.adj)
-                sp.save_npz(path + 'sp_normal_L.npz', self.L)
-                sp.save_npz(path + 'sp_neg_adj.npz', self.neg_adj)
-                np.save(path + 'sp_x_user.npy', self.x_user)
-                np.save(path + 'sp_x_item.npy', self.x_item)
-                np.save(path + 'sp_x_train_edge.npy', self.x_train_edge)
-                np.save(path + 'sp_x_test_edge.npy', self.x_test_edge)
-                print("cache saved to %s" % path[:-1])
-            return self.adj, self.L, self.neg_adj, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge
-        else:
-            print("using cache %s ..." % self.cache)
-            adj = sp.load_npz(self.cache + 'sp_adj.npz')
-            L = sp.load_npz(self.cache + 'sp_normal_L.npz')
-            neg_adj = sp.load_npz(self.cache + 'sp_neg_adj.npz')
-            x_user = np.load(self.cache + 'sp_x_user.npy')
-            x_item = np.load(self.cache + 'sp_x_item.npy')
-            x_train_edge = np.load(self.cache + 'sp_x_train_edge.npy')
-            x_test_edge = np.load(self.cache + 'sp_x_test_edge.npy')
+            sp.save_npz(self.cache + 'sp_adj.npz', self.adj)
+            sp.save_npz(self.cache + 'sp_normal_L.npz', self.L)
+            np.save(self.cache + 'x_user.npy', self.x_user)
+            np.save(self.cache + 'x_item.npy', self.x_item)
+            np.save(self.cache + 'x_train_edge.npy', self.x_train_edge)
+            np.save(self.cache + 'x_test_edge.npy', self.x_test_edge)
+            print("saved to %s" % self.cache)
 
-            return adj, L, neg_adj, x_user, x_item, x_train_edge, x_test_edge
+    def __getitem__(self, item):
+        return self.data['msno'][item], self.data['song_id'][item], self.y_train[item]
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_data(self):
+        return self.adj, self.L, self.x_user, self.x_item, self.x_train_edge, self.x_test_edge
 
     def id_mapping(self):
-        # print(self.mem_info['id'].max())
         pass
 
     def build_node_feature(self, data, who='mem'):
-        # print("data sorted by node_id...")
         print("building node features ...")
-        features = None
+        features = []
+        data = data.fillna(0)
         if who == 'song':
-            # id_col = data.columns.to_list()[0]
-            features = data.values[:, 1:]
-            # feat_dict = {}
-            # for i, id in enumerate(ids):
-            #     feat_dict[id] = features[i]
+            index_data = data.set_index('song_id')
+            num_col = len(index_data.columns)
+            for i in range(self.n_items):
+                if i in index_data.index:
+                    features.append(np.array(index_data.loc[i]))
+                else:
+                    features.append(np.zeros((num_col,)))
+
         if who == 'mem':
             src_dates = data['registration_init_time']
             dst_dates = data['expiration_date']
@@ -92,10 +108,14 @@ class NetworkData(object):
                 diffs.append(diff.days)
             data['date_diff'] = diffs
             data.drop(columns=['registration_init_time', 'expiration_date'], inplace=True)
-            features = data.values[:, 1:]
-#         if features.shape[0] < self.n_users + self.n_items:
-#             features = np.concatenate([features, np.zeros((self.n_users + self.n_items - features.shape[0], features.shape[1]))], axis=0)
-        return features
+            index_data = data.set_index('msno')
+            num_col = len(index_data.columns)
+            for i in range(self.n_users):
+                if i in index_data.index:
+                    features.append(np.array(index_data.loc[i]))
+                else:
+                    features.append(np.zeros((num_col,)))
+        return np.array(features)
 
     def build_edge_feature(self, data):
         print("building edge features ...")
@@ -109,36 +129,26 @@ class NetworkData(object):
     def build_adjacency(self):
         print("building adjacency ...")
         self.R = sp.dok_matrix((self.n_users, self.n_items), dtype=np.float32)
-        self.NR = sp.dok_matrix((self.n_users, self.n_items), dtype=np.float32)
 
         src, dst = self.train_data['msno'].tolist(), self.train_data['song_id'].tolist()
-        for i in tqdm(range(len(self.train_data)), desc="build positive links=> ", leave=False):
+        for i in tqdm(range(len(self.train_data)), desc="build positive links=> "):
             uid, iid = src[i], dst[i]
             self.R[uid, iid] = 1
-            # self.R[iid, uid] = 1
-        src, dst = self.neg_train_data['msno'].tolist(), self.neg_train_data['song_id'].tolist()
-        for i in tqdm(range(len(self.neg_train_data)), desc="build negtive links=> ", leave=False):
-            uid, iid = src[i], dst[i]
-            self.NR[uid, iid] = 1
-            # self.NR[iid, uid] = 1
+
+            # if uid in self.user2item:
+            #     self.user2item[uid].append(iid)
+            # else:
+            #     self.user2item[uid] = [iid]
 
         adj = sp.dok_matrix((self.n_users + self.n_items, self.n_users + self.n_items),
                             dtype=np.float32)
         adj = adj.tolil()
         R = self.R.tolil()
-
-        print("building postive adjacency ...")
         adj[: self.n_users, self.n_users:] = R
         adj[self.n_users:, :self.n_users] = R.T
         adj = adj.todok()
 
-        print("building negtive adjacency ...")
-        neg_adj = sp.dok_matrix((self.n_users + self.n_items, self.n_users + self.n_items),
-                            dtype=np.float32).tolil()
-        NR = self.NR.tolil()
-        neg_adj[: self.n_users, self.n_users:] = NR
-        neg_adj[self.n_users:, :self.n_users] = NR.T
-        return adj.tocoo(), self.normalize_adjacency(adj), neg_adj.tocoo()
+        return adj.tocoo(), self.normalize_adjacency(adj)
 
     def normalize_adjacency(self, adj):
         """
@@ -155,6 +165,50 @@ class NetworkData(object):
 
         L = d_sqrt_mat.dot(adj).dot(d_sqrt_mat)
         return L.tocoo()
+
+    def sampling(self, users):
+        for u in self.user2item:
+            neg_items = list(set(range(self.n_items)) - set(self.user2item[u]))
+            neg_items = np.random.choice(neg_items, 100)
+            self.neg_user2item[u] = neg_items
+
+        def sample_pos(u, num_sampling):
+            pos_items = self.user2item[u]
+            n_pos_items = len(pos_items)
+            sampling_result = []
+            while len(sampling_result) < num_sampling:
+                pos_item_id = np.random.randint(low=0, high=n_pos_items, size=1)[0]
+                pos_item = pos_items[pos_item_id]
+                if pos_item not in sampling_result:
+                    sampling_result.append(pos_item)
+            return sampling_result
+
+        def sample_neg(u, num_sampling):
+            sampling_result = []
+            while len(sampling_result) < num_sampling:
+                neg_item_id = np.random.randint(low=0, high=self.n_items, size=1)[0]
+                if neg_item_id not in self.user2item[u] and neg_item_id not in sampling_result:
+                    sampling_result.append(neg_item_id)
+            return sampling_result
+
+        pos_items, neg_items = [], []
+        if isinstance(users, torch.Tensor):
+            users = users.numpy()
+        sampling_users = []
+        for u in users:
+            if u in self.user2item:
+                sampling_users.append(u)
+                pos_items += sample_pos(u, 1)
+                neg_items += sample_neg(u, 1)
+
+        return sampling_users, pos_items, neg_items
+
+    def convert_sp_mat_to_sp_tensor(self, X):
+        coo = X.tocoo()
+        i = torch.from_numpy(np.asarray([coo.row, coo.col]).astype("int64")).long()
+        v = torch.from_numpy(coo.data.astype(np.float32))
+        return torch.sparse.FloatTensor(i, v, coo.shape)
+
 
     def describe(self):
         print("number of users: %d" % self.n_users)

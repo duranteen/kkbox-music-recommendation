@@ -25,7 +25,7 @@ from sampling import multi_hop_sampling
 from tqdm import tqdm
 
 
-learning_rate = 0.5
+learning_rate = 0.0001
 weight_decay = 0.
 num_epochs = 5
 batch_size = 512
@@ -45,7 +45,6 @@ train_dataloader = DataLoader(dataset=data, batch_size=batch_size, shuffle=True)
 # norm
 # x_user = x_user / (x_user.sum(1, keepdims=True) + 0.01)
 # x_item = x_item / (x_item.sum(1, keepdims=True) + 0.01)
-
 
 # to tensor
 x_user = torch.from_numpy(np.float32(x_user))
@@ -87,7 +86,6 @@ def sampling_neighbor_feature(user_id, item_id,
                               user2item, item2user,
                               num_neighbor_list):
     """
-
     :param user_id:
     :param item_id:
     :param x_user:

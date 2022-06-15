@@ -4,11 +4,10 @@ from torch.nn import init, functional as F
 
 
 class GNN(nn.Module):
-    def __init__(self, input_dim, embedding_dim,
+    def __init__(self, embedding_dim,
                  num_layers=3, dropout=0., activation=F.relu):
         """
         use 3 layers and residual GCNs
-        :param input_dim:
         :param hidden_dim1:
         :param hidden_dim2:
         :param output_dim:
@@ -20,8 +19,8 @@ class GNN(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
         # self.linear = nn.Linear(input_dim, hidden_dim)
-        self.gcn1 = GCNLayer(input_dim, embedding_dim)
-        self.gcn2 = GCNLayer(embedding_dim, embedding_dim)
+        self.gcn = GCNLayer(embedding_dim, embedding_dim)
+        # self.gcn2 = GCNLayer(embedding_dim, embedding_dim)
         # self.gcn3 = GCNLayer(embedding_dim, embedding_dim)
 
     def forward(self, adjacency, features):
@@ -36,11 +35,11 @@ class GNN(nn.Module):
         # x = F.sigmoid(projected_x)
         x = features
         # GCN layer
-        gcn1_x = self.gcn1(adjacency, x)
+        gcn1_x = self.gcn(adjacency, x)
         x = self.activation(gcn1_x)
-        gcn2_x = self.gcn2(adjacency, x)
+        gcn2_x = self.gcn(adjacency, x)
         x = self.activation(gcn2_x)
-        gcn3_x = self.gcn2(adjacency, x)
+        gcn3_x = self.gcn(adjacency, x)
         return torch.cat([features, gcn1_x, gcn2_x, gcn3_x], 1)
 
 

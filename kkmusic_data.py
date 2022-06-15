@@ -1,4 +1,3 @@
-# build adjacency and normalize adjacency
 import itertools
 import os
 import os.path as op
