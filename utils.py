@@ -1,4 +1,5 @@
 # build adjacency and normalize adjacency
+import json
 import os.path as op
 import os
 import random
@@ -35,14 +36,36 @@ class NetworkData(dataset.Dataset):
         self.y_train = self.data['target']
         if 'target' in self.train_data.columns:
             self.train_data = self.train_data.drop('target', axis=1)
-        src, dst = self.train_data['msno'].tolist(), self.train_data['song_id'].tolist()
-        for i in tqdm(range(len(self.train_data)), desc="build user-item table=> "):
-            uid, iid = src[i], dst[i]
-            if uid in self.user2item:
-                self.user2item[uid].append(iid)
-            else:
-                self.user2item[uid] = [iid]
-        self.existing_users = self.user2item.keys()
+
+        try:
+            fp = open(self.cache + 'user2item.json', 'r')
+            self.user2item = json.load(fp)
+            fp.close()
+            fp = open(self.cache + 'neg_user2item.json', 'r')
+            self.neg_user2item = json.load(fp)
+            fp.close()
+        except:
+            src, dst = self.train_data['msno'].tolist(), self.train_data['song_id'].tolist()
+            for i in tqdm(range(len(self.train_data)), desc="build user-item table=> "):
+                uid, iid = src[i], dst[i]
+                if uid in self.user2item:
+                    self.user2item[uid].append(iid)
+                else:
+                    self.user2item[uid] = [iid]
+            self.existing_users = self.user2item.keys()
+            for u in tqdm(self.user2item, desc="build neg user-item table=> "):
+                neg_items = list(set(range(self.n_items)) - set(self.user2item[u]))
+                neg_items = list(np.random.choice(neg_items, 100))
+                self.neg_user2item[u] = neg_items
+            info = json.dumps(self.user2item, sort_keys=False, indent=4, separators=(',', ':'))
+            fp = open(self.cache + 'user2item.json', 'w')
+            fp.write(info)
+            fp.close()
+            info = json.dumps(self.neg_user2item, sort_keys=False, indent=4, separators=(',', ':'))
+            fp = open(self.cache + 'neg_user2item.json', 'w')
+            fp.write(info)
+            fp.close()
+
 
         try:
             self.adj = sp.load_npz(self.cache + 'sp_adj.npz')
@@ -167,11 +190,6 @@ class NetworkData(dataset.Dataset):
         return L.tocoo()
 
     def sampling(self, users):
-        for u in self.user2item:
-            neg_items = list(set(range(self.n_items)) - set(self.user2item[u]))
-            neg_items = np.random.choice(neg_items, 100)
-            self.neg_user2item[u] = neg_items
-
         def sample_pos(u, num_sampling):
             pos_items = self.user2item[u]
             n_pos_items = len(pos_items)
@@ -193,7 +211,7 @@ class NetworkData(dataset.Dataset):
 
         pos_items, neg_items = [], []
         if isinstance(users, torch.Tensor):
-            users = users.numpy()
+            users = users.cpu().numpy()
         sampling_users = []
         for u in users:
             if u in self.user2item:
@@ -222,25 +240,3 @@ if __name__ == '__main__':
     network_data = NetworkData(cache=None, save=True)
     out = network_data.get_data()
     # network_data.describe()
-
-"""
-34404 419840
-building adjacency ...
-build positive links=> : 100%|██████████| 3714656/3714656 [00:17<00:00, 210817.41it/s]
-build negtive links=> : 100%|██████████| 3662762/3662762 [00:16<00:00, 216244.49it/s]
-building postive adjacency ...
-building negtive adjacency ...
-normalize adjacency ...
-/Users/duran/PycharmProjects/kkbox-music-recommendation/utils.py:153: RuntimeWarning: divide by zero encountered in power
-  d_sqrt = np.power(row_sum, -0.5).flatten()
-building node features ...
-building node features ...
-building edge features ...
-building edge features ...
-get data: 	cache saved to data/cache
-number of users: 34404
-number of songs: 419840
-adjacency: (454244, 454244)
-Lap: (454244, 454244)
-dim of user feature: 6
-"""
