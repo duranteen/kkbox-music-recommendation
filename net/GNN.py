@@ -7,6 +7,7 @@ class GNN(nn.Module):
     def __init__(self, embedding_dim,
                  num_layers=3, dropout=0., activation=F.relu):
         """
+
         use 3 layers and residual GCNs
         :param hidden_dim1:
         :param hidden_dim2:

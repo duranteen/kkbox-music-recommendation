@@ -48,7 +48,6 @@ class BPRNet(nn.Module):
 
         edge_pred = torch.mul(user_embeddings, item_embeddings)
         edge_pred = torch.sigmoid(self.edge_linear(edge_pred))
-
         edge_pred_loss = torch.mean((edge_pred - y_edge) ** 2)
 
         return mf_loss + emb_loss + edge_pred_loss, mf_loss + emb_loss, edge_pred_loss
